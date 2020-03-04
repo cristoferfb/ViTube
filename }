@@ -1,0 +1,17 @@
+#!/bin/bash
+
+declare -a draw_jobs
+draw_jobs[0]="draw_ui" 
+
+draw () {
+	tput setb 0
+	clear
+
+}
+
+
+drawTui
+
+read -sn 1
+
+tput reset
