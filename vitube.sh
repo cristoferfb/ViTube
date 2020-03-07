@@ -1,5 +1,7 @@
 #!/bin/bash
 
+bind '"\C-w": kill-whole-line'
+bind '"\e": "\C-w\C-d"'
 mkdir -p ~/.config/vitube
 
 _draw_flag=true
@@ -44,6 +46,9 @@ __execute_command () {
 			tput reset
 			exit 0
 			;;
+		"reload")
+			:	
+			;;
 	esac
 }
 
@@ -53,7 +58,7 @@ __command_mode () {
 	tput cup "$(tput lines)" 0
 	tput setb 0
 	tput setf 7
-	read -rp ':' _command _arg
+	read -erp ':' _command _arg
 	_draw # TODO avoid to redraw all TUI after read
 	__execute_command "$_command" "$_arg"
 }
