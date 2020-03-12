@@ -1,8 +1,13 @@
 #!/bin/bash
 
+CACHE_DIR=".cache/vitube"
+
+
 bind '"\C-w": kill-whole-line'
 bind '"\e": "\C-w\C-d"'
+
 mkdir -p ~/.config/vitube
+mkdir -p $CACHE_DIR
 
 _draw_flag=true
 _draw_jobs=(
@@ -37,6 +42,23 @@ _draw () { # Execute all draw jobs
 	done
 }
 
+__fetch_new_videos () {
+    _cache_file_name=$(echo $1 | grep -oP '\w+$') 
+    
+    if [ -f "~/${CACHE_DIR}/${_cache_file_name}" ]; then
+        _last_video=$(head -n 1 "~/${CACHE_DIR}/$_cache_file_name") 
+    else
+        curl --silent $1 | 
+        gawk 'match($0, /yt-lockup-title.+title="([^"]+)".*href="([^"]+)".*Duration: (.*\.)/, a) {print "\"" a[1] "\"\t\"" a[2] "\"\t\"" a[3] "\""}' > ~/${CACHE_DIR}/${_cache_file_name}
+    fi
+}
+
+__fetch_subscriptions () {
+    while IFS= read -r _line; do
+        __fetch_new_videos $_line
+        #$(curl --silent $_line | grep yt-lockup-title) $_line
+    done < ~/.config/vitube/subscriptions
+}
 __execute_command () {
 	case "$1" in
 		"add")
@@ -45,9 +67,9 @@ __execute_command () {
 		"quit")
 			tput reset
 			exit 0
-			;;
+		    ;;
 		"reload")
-			:	
+            __fetch_subscriptions
 			;;
 	esac
 }
