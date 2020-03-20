@@ -16,9 +16,9 @@ _draw_jobs=(
 )
 
 __draw_background () { # Draw TUI background
-	tput setb 0
+	tput setab 0
 	clear
-	tput setb 7
+	tput setab 7
 	tput il 1
 	tput cup "$(tput lines)" 0
 	tput cuu1
@@ -28,12 +28,16 @@ __draw_background () { # Draw TUI background
 __draw_text () { # Draw TUI text
 	local _help_text="q:Exit  j:Down  k:Up  r:Reload"
 	local _status_text="--ViTube: "
-	tput setf 0
+	tput setaf 0
 	tput cup 0 0
 	printf "%.*s" "$(tput cols)" "$_help_text"
 	tput cup "$(tput lines)" 0
 	tput cuu1
 	printf "%.*s" "$(tput cols)" "$_status_text"
+}
+
+__draw_subscriptions () {
+   : 
 }
 
 _draw () { # Execute all draw jobs
@@ -42,18 +46,19 @@ _draw () { # Execute all draw jobs
 	done
 }
 
-__fetch_new_videos () {
+__fetch_new_videos () { # Web scraping videos from channel
     _cache_file_name=$(echo $1 | grep -oP '\w+$') 
     
     if [ -f "~/${CACHE_DIR}/${_cache_file_name}" ]; then
         _last_video=$(head -n 1 "~/${CACHE_DIR}/$_cache_file_name") 
+        #TODO only load new videos
     else
         curl --silent $1 | 
         gawk 'match($0, /yt-lockup-title.+title="([^"]+)".*href="([^"]+)".*Duration: (.*\.)/, a) {print "\"" a[1] "\"\t\"" a[2] "\"\t\"" a[3] "\""}' > ~/${CACHE_DIR}/${_cache_file_name}
     fi
 }
 
-__fetch_subscriptions () {
+__fetch_subscriptions () { # Read subscriptions from file
     while IFS= read -r _line; do
         __fetch_new_videos $_line
         #$(curl --silent $_line | grep yt-lockup-title) $_line
@@ -90,6 +95,9 @@ __read_key () {
 		"q")
 			__execute_command "quit"
 			;;
+        "r")
+            __execute_command "reload"
+            ;;
 		":")
 			__command_mode
 			;;
