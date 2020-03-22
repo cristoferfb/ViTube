@@ -2,7 +2,6 @@
 
 CACHE_DIR=".cache/vitube"
 
-
 bind '"\C-w": kill-whole-line'
 bind '"\e": "\C-w\C-d"'
 
@@ -13,6 +12,7 @@ _draw_flag=true
 _draw_jobs=(
 	"__draw_background"
 	"__draw_text"
+    "__draw_subscriptions"
 )
 
 __draw_background () { # Draw TUI background
@@ -37,7 +37,13 @@ __draw_text () { # Draw TUI text
 }
 
 __draw_subscriptions () {
-   : 
+    tput cup 1 0
+    tput setab 0
+    tput setaf 7
+    local _lname=$(( $(tput cols)*75/100 ))
+    local _ltime=$(( $(tput cols)*25/100 ))
+
+    gawk -v lname=$_lname -v ltime=$_ltime '{ printf "%.*s %.*s\n", lname, $1, ltime, $3 }' FS='\t' ~/${CACHE_DIR}/newvideos
 }
 
 _draw () { # Execute all draw jobs
@@ -49,13 +55,19 @@ _draw () { # Execute all draw jobs
 __fetch_new_videos () { # Web scraping videos from channel
     _cache_file_name=$(echo $1 | grep -oP '\w+$') 
     
-    if [ -f "~/${CACHE_DIR}/${_cache_file_name}" ]; then
-        _last_video=$(head -n 1 "~/${CACHE_DIR}/$_cache_file_name") 
+    #if [ -f "~/${CACHE_DIR}/${_cache_file_name}" ]; then
+    #    _last_video=$(head -n 1 "~/${CACHE_DIR}/$_cache_file_name") 
         #TODO only load new videos
-    else
-        curl --silent $1 | 
-        gawk 'match($0, /yt-lockup-title.+title="([^"]+)".*href="([^"]+)".*Duration: (.*\.)/, a) {print "\"" a[1] "\"\t\"" a[2] "\"\t\"" a[3] "\""}' > ~/${CACHE_DIR}/${_cache_file_name}
-    fi
+    #else
+    curl --silent "$1/videos" | 
+    gawk 'match($0, /yt-lockup-title.+title="([^"]+)".*href="([^"]+)".*Duration: (.*\.)/, a) {print a[1] "\t" a[2] "\t" a[3]}' > ~/${CACHE_DIR}/${_cache_file_name}
+    #fi
+    
+    rm -f ~/${CACHE_DIR}/newvideos
+    # generate new videos file
+    for filename in ~/${CACHE_DIR}/*; do
+        head -2 $filename >> ~/${CACHE_DIR}/newvideos
+    done
 }
 
 __fetch_subscriptions () { # Read subscriptions from file
@@ -75,7 +87,8 @@ __execute_command () {
 		    ;;
 		"reload")
             __fetch_subscriptions
-			;;
+            __draw_subscriptions
+            ;;
 	esac
 }
 
