@@ -1,6 +1,8 @@
 #!/bin/bash
 
 CACHE_DIR=".cache/vitube"
+_nav_page=0
+_nav_position=0
 
 bind '"\C-w": kill-whole-line'
 bind '"\e": "\C-w\C-d"'
@@ -37,13 +39,33 @@ __draw_text () { # Draw TUI text
 }
 
 __draw_subscriptions () {
-    tput cup 1 0
-    tput setab 0
-    tput setaf 7
-    local _lname=$(( $(tput cols)*75/100 ))
-    local _ltime=$(( $(tput cols)*25/100 ))
-
-    gawk -v lname=$_lname -v ltime=$_ltime '{ printf "%.*s %.*s\n", lname, $1, ltime, $3 }' FS='\t' ~/${CACHE_DIR}/newvideos
+    if test -f ~/$CACHE_DIR/newvideos; then
+        tput cup 1 0
+        local _begin=$(( $_nav_page*($(tput lines)-3)+1 ))
+        local _end=$(( $_begin + $(tput lines) - 4 ))
+        local _lcount=0
+        while read -r line; do
+            tput setab 0
+            tput setaf 7
+            # Highligh selected item
+            if test $_lcount -eq $_nav_position ;then
+                tput setab 7
+                tput setaf 0
+            fi
+            echo "$line" |
+            gawk -v lname=$(tput cols) '{ printf "%.*s\n", lname, $1 }' FS='\t'
+            let _lcount++
+        done <<< "$(sed -n "$_begin,$_end p" ~/$CACHE_DIR/newvideos)"
+        
+        # Clear empty lines
+        tput setab 0
+        tput setaf 7
+        while test $_lcount -ne $(( $(tput lines)-3 ));do
+            tput el
+            echo
+            let _lcount++
+        done
+    fi
 }
 
 _draw () { # Execute all draw jobs
@@ -55,10 +77,6 @@ _draw () { # Execute all draw jobs
 __fetch_new_videos () { # Web scraping videos from channel
     _cache_file_name=$(echo $1 | grep -oP '\w+$') 
     
-    #if [ -f "~/${CACHE_DIR}/${_cache_file_name}" ]; then
-    #    _last_video=$(head -n 1 "~/${CACHE_DIR}/$_cache_file_name") 
-        #TODO only load new videos
-    #else
     curl --silent "$1/videos" | 
     gawk 'match($0, /yt-lockup-title.+title="([^"]+)".*href="([^"]+)".*Duration: (.*\.)/, a) {print a[1] "\t" a[2] "\t" a[3]}' > ~/${CACHE_DIR}/${_cache_file_name}
     #fi
@@ -66,16 +84,28 @@ __fetch_new_videos () { # Web scraping videos from channel
     rm -f ~/${CACHE_DIR}/newvideos
     # generate new videos file
     for filename in ~/${CACHE_DIR}/*; do
-        head -2 $filename >> ~/${CACHE_DIR}/newvideos
+        head -3 $filename >> ~/${CACHE_DIR}/newvideos
     done
 }
 
 __fetch_subscriptions () { # Read subscriptions from file
     while IFS= read -r _line; do
         __fetch_new_videos $_line
-        #$(curl --silent $_line | grep yt-lockup-title) $_line
     done < ~/.config/vitube/subscriptions
 }
+
+__clear_subscriptions () {
+    tput cup 1 0
+    tput setab 0
+    tput setaf 7
+    local _line=0
+    while test $_line -ne $(( $(tput lines) - 3 )); do
+        tput el
+        echo
+        let _line++
+    done
+}
+
 __execute_command () {
 	case "$1" in
 		"add")
@@ -87,8 +117,32 @@ __execute_command () {
 		    ;;
 		"reload")
             __fetch_subscriptions
+            __clear_subscriptions
             __draw_subscriptions
             ;;
+        "up")
+            if test $_nav_position -eq 0; then
+                if test $_nav_page -ne 0; then
+                    let _nav_page--
+                    _nav_position=$(( $(tput lines)-4))
+                    __clear_subscriptions
+                fi
+            else
+                let _nav_position--
+            fi
+            __draw_subscriptions
+            ;;
+        "down")
+            if test $_nav_position -eq $(( $(tput lines)-4 )) ; then
+                _nav_position=0
+                let _nav_page++
+                __clear_subscriptions
+            else
+                let _nav_position++
+            fi
+            __draw_subscriptions
+            ;;
+            
 	esac
 }
 
@@ -105,6 +159,12 @@ __command_mode () {
 
 __read_key () {
 	case "$1" in
+        "j")
+            __execute_command "down"  
+            ;;
+        "k")
+            __execute_command "up"
+            ;;
 		"q")
 			__execute_command "quit"
 			;;
