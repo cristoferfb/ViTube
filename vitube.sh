@@ -142,7 +142,14 @@ __execute_command () {
             fi
             __draw_subscriptions
             ;;
+        "play")
+            local _video=$(( $_nav_page*($(tput lines)-3) + $_nav_position + 1 ))
             
+            local _url=$(sed "$_video q;d" ~/${CACHE_DIR}/newvideos | 
+                gawk '{ print "https://youtube.com"$2 }' FS='\t')
+            
+            mpv $_url &> /dev/null &
+            ;;
 	esac
 }
 
@@ -170,6 +177,9 @@ __read_key () {
 			;;
         "r")
             __execute_command "reload"
+            ;;
+        "")
+            __execute_command "play"
             ;;
 		":")
 			__command_mode
